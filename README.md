@@ -4,11 +4,13 @@ Dashboard interativo para visualização de dados de pesquisa sobre Process Inte
 
 ## Características
 
-- 📊 Gráficos interativos com Chart.js
-- 📱 Design responsivo
-- 🎨 Interface moderna e intuitiva
-- ⚡ API REST para dados em tempo real
+- 📊 Gráficos interativos com Plotly
+- 📱 Design responsivo e moderno
+- 🎨 Interface intuitiva com Streamlit
+- ⚡ Atualização em tempo real
 - 💬 Visualização de comentários dos usuários
+- 📥 Exportação de dados em CSV
+- 🔍 Filtros e análises detalhadas
 
 ## Instalação
 
@@ -25,49 +27,92 @@ pip3 install -r requirements.txt
 ## Executar a aplicação
 
 ```bash
-python3 app.py
+streamlit run streamlit_app.py
 ```
 
-O dashboard estará disponível em: http://localhost:5000
+O dashboard estará disponível em: http://localhost:8501
 
 ## Estrutura do Projeto
 
 ```
 pipefy-dashboard/
-├── app.py                  # Aplicação Flask principal
+├── streamlit_app.py        # Aplicação Streamlit principal
 ├── requirements.txt        # Dependências Python
-├── templates/
-│   └── index.html         # Template HTML do dashboard
-└── static/
-    └── css/
-        └── style.css      # Estilos CSS
+├── .streamlit/
+│   └── config.toml        # Configurações e tema
+└── README.md              # Documentação
 ```
 
-## Endpoints da API
+## Funcionalidades
 
-- `GET /` - Dashboard principal
-- `GET /api/tempo-uso` - Dados de tempo de uso
-- `GET /api/frequencia` - Dados de frequência de análises
-- `GET /api/departamentos` - Dados de departamentos
-- `GET /api/facilidade` - Dados de facilidade de uso
-- `GET /api/utilidade` - Dados de utilidade geral
-- `GET /api/objetivos` - Dados de objetivos da área
+### 📈 KPIs Principais
+- Total de respondentes
+- Taxa de utilidade (% de usuários satisfeitos)
+- Taxa de engajamento (% de uso frequente)
+- Taxa de facilidade de uso
+
+### 📊 Visualizações Interativas
+- Tempo de uso do Pipefy (gráfico de rosca)
+- Frequência de análises (gráfico de rosca)
+- Facilidade de uso (gráfico de rosca)
+- Utilidade geral (gráfico de rosca)
+- Top 10 departamentos (gráfico de barras)
+- Objetivos da área (gráfico de barras)
+
+### 💬 Feedback Qualitativo
+- Comentários sobre facilidade de uso
+- Comentários sobre utilidade
+- Seções expansíveis para navegação fácil
+
+### 📥 Exportação de Dados
+- Exportar dados de tempo de uso em CSV
+- Exportar dados de frequência em CSV
+- Tabelas detalhadas com percentuais
 
 ## Métricas Disponíveis
 
-- Total de respondentes
-- Taxa de utilidade
-- Taxa de engajamento
-- Taxa de facilidade de uso
+- Total de respondentes: 247
 - Distribuição por tempo de uso
 - Frequência de análises
-- Distribuição por departamento
+- Distribuição por departamento (37 únicos)
+- Facilidade de uso
+- Utilidade geral
 - Objetivos da área
-- Comentários dos usuários
+- 49 comentários sobre facilidade
+- 19 comentários sobre utilidade
 
 ## Tecnologias Utilizadas
 
-- **Backend**: Flask (Python)
-- **Frontend**: HTML5, CSS3, JavaScript
-- **Visualização**: Chart.js
+- **Framework**: Streamlit
+- **Visualização**: Plotly
 - **Processamento de Dados**: Pandas
+- **Leitura de Excel**: OpenPyXL
+- **Linguagem**: Python 3.9+
+
+## Deploy
+
+### Streamlit Cloud (Gratuito)
+
+1. Faça push do código para GitHub
+2. Acesse https://streamlit.io/cloud
+3. Conecte seu repositório
+4. Configure o arquivo principal como `streamlit_app.py`
+5. Deploy automático!
+
+### Local
+
+```bash
+streamlit run streamlit_app.py --server.port 8501
+```
+
+## Customização
+
+Edite `.streamlit/config.toml` para personalizar:
+- Cores do tema
+- Porta do servidor
+- Configurações de cache
+- E mais...
+
+## Sobre
+
+Dashboard desenvolvido para análise de dados de pesquisa sobre Process Intelligence do Pipefy, permitindo visualização interativa de métricas de uso, satisfação e feedback dos usuários.
