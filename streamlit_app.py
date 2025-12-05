@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import os
 
 # Configuração da página
 st.set_page_config(
@@ -12,8 +13,8 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Caminho para o arquivo Excel
-EXCEL_PATH = '/Users/thomazkrause/Server/process-inteligence/maze_process-intelligence.xlsx'
+# Caminho para o arquivo Excel (relativo ao script)
+EXCEL_PATH = os.path.join(os.path.dirname(__file__), 'maze_process-intelligence.xlsx')
 
 # Cache de dados
 @st.cache_data
