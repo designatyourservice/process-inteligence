@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """
-sigfapes_submit.py — Automação Playwright para submissão de formulário de notas no SIGFAPES.
+sigfapes_submit.py — Automação Playwright para submissão do Anexo II (Lançamento de notas) no SIGFAPES.
 
 Fluxo:
   1. Login em https://sigfapes.fapes.es.gov.br
   2. Navega até o projeto Talqui
-  3. Sidebar → Novo Formulário → cria formulário de notas
-  4. Preenche campos com dados da nota Markdown
-  5. Anexa o PDF gerado
-  6. Salva e fecha
+  3. Menu lateral → "6.1 Novo Formulário"
+  4. Dropdown "Formulários de Prestação de Contas" → "Anexo II - Lançamento de notas"
+  5. Clica em "Novo"
+  6. Preenche todos os campos do formulário com dados da nota Markdown
+  7. Anexa o PDF gerado
+  8. Salva e fecha
 
 Uso:
   python3 sigfapes_submit.py --pdf output/merged_*.pdf --note output/note_*.md
@@ -32,41 +34,48 @@ SIGFAPES_URL = "https://sigfapes.fapes.es.gov.br"
 PROJECT_NAME = "Talqui"
 
 
+def _extract_field(content: str, label: str) -> str:
+    """Extrai o valor de um campo '**Label:** valor' do Markdown."""
+    match = re.search(rf"\*\*{re.escape(label)}:\*\*\s+(.+)$", content, re.MULTILINE)
+    return match.group(1).strip() if match else ""
+
+
+def _extract_section(content: str, heading: str) -> str:
+    """Extrai o texto entre '## Heading' e o próximo '##'."""
+    match = re.search(rf"## {re.escape(heading)}\s*\n(.*?)(?=\n##|\Z)", content, re.DOTALL)
+    return match.group(1).strip() if match else ""
+
+
 def load_note(note_path: Path) -> dict:
-    """Lê o arquivo .md e extrai título, data, tipo, descrição e pontos-chave."""
+    """Lê o arquivo .md e extrai os campos do formulário Anexo II — Lançamento de notas."""
     content = note_path.read_text(encoding="utf-8")
 
     # Título: primeira linha com #
     title_match = re.search(r"^#\s+(.+)$", content, re.MULTILINE)
-    title = title_match.group(1).strip() if title_match else "Nota sem título"
+    titulo = title_match.group(1).strip() if title_match else "Nota sem título"
 
-    # Data
-    date_match = re.search(r"\*\*Data:\*\*\s+(.+)$", content, re.MULTILINE)
-    date = date_match.group(1).strip() if date_match else ""
+    # Campos diretos (formato **Label:** valor)
+    data_pagamento = _extract_field(content, "Data de Pagamento")
+    razao_social   = _extract_field(content, "Razão Social")
+    cnpj           = _extract_field(content, "CNPJ")
+    num_nf         = _extract_field(content, "Nº da Nota Fiscal")
+    valor_liquido  = _extract_field(content, "Valor Líquido")
+    forma_pagamento = _extract_field(content, "Forma de Pagamento")
+    num_pagamento  = _extract_field(content, "Nº do Documento de Pagamento")
 
-    # Tipo
-    tipo_match = re.search(r"\*\*Tipo:\*\*\s+(.+)$", content, re.MULTILINE)
-    tipo = tipo_match.group(1).strip() if tipo_match else ""
-
-    # Descrição (entre ## Descrição e o próximo ##)
-    desc_match = re.search(r"## Descrição\s*\n(.*?)(?=\n##|\Z)", content, re.DOTALL)
-    descricao = desc_match.group(1).strip() if desc_match else ""
-
-    # Pontos-chave (lista de bullets)
-    pontos_match = re.search(r"## Pontos-chave\s*\n(.*?)(?=\n##|\Z)", content, re.DOTALL)
-    pontos_raw = pontos_match.group(1).strip() if pontos_match else ""
-    pontos = [
-        line.lstrip("- •*").strip()
-        for line in pontos_raw.splitlines()
-        if line.strip().startswith(("-", "•", "*"))
-    ]
+    # Escopo: conteúdo da seção "## Serviço / Escopo"
+    escopo = _extract_section(content, "Serviço / Escopo")
 
     return {
-        "titulo": title,
-        "data": date,
-        "tipo": tipo,
-        "descricao": descricao,
-        "pontos": pontos,
+        "titulo":          titulo,
+        "data_pagamento":  data_pagamento,
+        "razao_social":    razao_social,
+        "cnpj":            cnpj,
+        "num_nf":          num_nf,
+        "valor_liquido":   valor_liquido,
+        "forma_pagamento": forma_pagamento,
+        "num_pagamento":   num_pagamento,
+        "escopo":          escopo,
     }
 
 
@@ -93,9 +102,12 @@ def run(pdf_path: Path, note_path: Path, headless: bool):
     login, password = check_env()
     note = load_note(note_path)
 
-    print(f"\n📄 PDF:  {pdf_path}")
-    print(f"📝 Nota: {note_path}")
-    print(f"📌 Título extraído: {note['titulo']}")
+    print(f"\n📄 PDF:       {pdf_path}")
+    print(f"📝 Nota:      {note_path}")
+    print(f"📌 Título:    {note['titulo']}")
+    print(f"🏢 Fornecedor: {note['razao_social']} | CNPJ: {note['cnpj']}")
+    print(f"📃 NF nº:     {note['num_nf']}  |  Valor: {note['valor_liquido']}")
+    print(f"📅 Pagamento: {note['data_pagamento']}  |  {note['forma_pagamento']}")
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=headless, slow_mo=300 if not headless else 0)
@@ -192,38 +204,91 @@ def run(pdf_path: Path, note_path: Path, headless: bool):
 
         step(f"Projeto '{PROJECT_NAME}' aberto.")
 
-        # ── 3. Sidebar → Novo Formulário ────────────────────────────────────────
-        step("Navegando para Novo Formulário no menu lateral...")
+        # ── 3. Menu lateral → "6.1 Novo Formulário" ─────────────────────────────
+        step("Menu lateral → '6.1 Novo Formulário'...")
 
-        form_nav_selectors = [
+        menu_selectors = [
+            'a:has-text("6.1 Novo Formulário")',
+            'a:has-text("6.1 Novo Formulario")',
+            'li:has-text("6.1 Novo Formulário") a',
+            'span:has-text("6.1 Novo Formulário")',
             'a:has-text("Novo Formulário")',
-            'a:has-text("Novo Formulario")',
-            'li:has-text("Novo Formulário") a',
-            'span:has-text("Novo Formulário")',
             '[href*="novo-formulario"]',
             '[href*="novoFormulario"]',
         ]
-        for sel in form_nav_selectors:
+        menu_found = False
+        for sel in menu_selectors:
             try:
                 el = page.wait_for_selector(sel, timeout=5_000)
                 if el:
                     el.click()
                     page.wait_for_load_state("networkidle")
+                    menu_found = True
                     break
             except PWTimeout:
                 continue
 
-        # Clica no botão de criar novo formulário de notas
-        new_form_selectors = [
-            'button:has-text("Nova Nota")',
-            'button:has-text("Novo")',
-            'a:has-text("Nova Nota")',
-            'button:has-text("Adicionar")',
-            'button:has-text("Criar")',
-            '[title*="nova nota"]',
-            '[title*="novo formulário"]',
+        if not menu_found:
+            page.screenshot(path="output/debug_menu.png")
+            print("ERRO: Item '6.1 Novo Formulário' não encontrado no menu lateral.")
+            print("Screenshot salva em output/debug_menu.png")
+            browser.close()
+            sys.exit(1)
+
+        step("Página '6.1 Novo Formulário' aberta.")
+
+        # ── 4. Dropdown "Formulários de Prestação de Contas" → Anexo II ─────────
+        step("Selecionando 'Anexo II - Lançamento de notas'...")
+
+        anexo_selectors = [
+            'select:near(:text("Formulários de Prestação de Contas"))',
+            'select[name*="formulario"]',
+            'select[name*="prestacao"]',
+            'select[id*="formulario"]',
+            'select',
         ]
-        for sel in new_form_selectors:
+        anexo_selected = False
+        for sel in anexo_selectors:
+            try:
+                el = page.wait_for_selector(sel, timeout=4_000)
+                if el:
+                    for label in [
+                        "Anexo II - Lançamento de notas",
+                        "Anexo II - Lancamento de notas",
+                        "Anexo II",
+                        "Lançamento de notas",
+                    ]:
+                        try:
+                            el.select_option(label=label)
+                            anexo_selected = True
+                            break
+                        except Exception:
+                            continue
+                if anexo_selected:
+                    page.wait_for_load_state("networkidle")
+                    break
+            except PWTimeout:
+                continue
+
+        if not anexo_selected:
+            page.screenshot(path="output/debug_anexo.png")
+            print("ERRO: Dropdown 'Anexo II - Lançamento de notas' não encontrado.")
+            print("Screenshot salva em output/debug_anexo.png")
+            browser.close()
+            sys.exit(1)
+
+        step("'Anexo II - Lançamento de notas' selecionado.")
+
+        # ── 5. Clica em "Novo" ───────────────────────────────────────────────────
+        step("Clicando no botão 'Novo'...")
+
+        novo_selectors = [
+            'button:has-text("Novo")',
+            'a:has-text("Novo")',
+            'input[value="Novo"]',
+            'button:has-text("Adicionar")',
+        ]
+        for sel in novo_selectors:
             try:
                 el = page.wait_for_selector(sel, timeout=4_000)
                 if el:
@@ -233,48 +298,102 @@ def run(pdf_path: Path, note_path: Path, headless: bool):
             except PWTimeout:
                 continue
 
-        step("Formulário de notas aberto.")
+        step("Formulário Anexo II aberto.")
 
-        # ── 4. Preencher campos do formulário ───────────────────────────────────
+        # ── 6. Preencher campos do formulário ───────────────────────────────────
         step("Preenchendo campos do formulário...")
 
-        field_map = [
-            (['input[name="titulo"]', 'input[placeholder*="ítulo"]', '#titulo'], note["titulo"]),
-            (['input[name="data"]', 'input[type="date"]', '#data'], note["data"]),
-            (['input[name="tipo"]', 'select[name="tipo"]', '#tipo'], note["tipo"]),
-            (['textarea[name="descricao"]', 'textarea[name="descricaoo"]', '#descricao',
-              'textarea'], note["descricao"]),
-        ]
-
-        for selectors, value in field_map:
+        def fill_field(selectors: list, value: str, field_name: str = ""):
+            """Tenta preencher um campo texto ou selecionar opção de dropdown."""
             if not value:
-                continue
+                return
             for sel in selectors:
                 try:
                     el = page.wait_for_selector(sel, timeout=2_000)
                     if el:
                         tag = el.evaluate("e => e.tagName.toLowerCase()")
                         if tag == "select":
-                            # Tenta selecionar opção que contém o texto
                             el.select_option(label=value)
                         else:
                             el.fill(value)
-                        break
+                        print(f"   ✓ {field_name or sel}: {value}")
+                        return
                 except (PWTimeout, Exception):
                     continue
+            if value:
+                print(f"   ⚠ Campo não encontrado: {field_name or selectors[0]}")
 
-        # Pontos-chave em campo separado, se existir
-        if note["pontos"]:
-            pontos_text = "\n".join(f"- {p}" for p in note["pontos"])
-            for sel in ['textarea[name="pontos"]', 'textarea[name="observacoes"]',
-                        'textarea[name="obs"]']:
-                try:
-                    el = page.wait_for_selector(sel, timeout=1_500)
-                    if el:
-                        el.fill(pontos_text)
-                        break
-                except PWTimeout:
-                    continue
+        # Data de pagamento
+        fill_field(
+            ['input[name*="dataPagamento"]', 'input[name*="data_pagamento"]',
+             'input[placeholder*="pagamento"]', 'input[type="date"]'],
+            note["data_pagamento"], "Data de pagamento",
+        )
+
+        # Natureza da despesa → Pessoa Jurídica (fixo para NF)
+        fill_field(
+            ['select[name*="natureza"]', 'select[name*="despesa"]',
+             'select[id*="natureza"]', 'select:near(:text("Natureza"))'],
+            "Pessoa Jurídica", "Natureza da despesa",
+        )
+
+        # Credor / Fornecedor
+        fill_field(
+            ['input[name*="credor"]', 'input[name*="fornecedor"]',
+             'input[placeholder*="redor"]', 'input[placeholder*="ornecedor"]'],
+            note["razao_social"], "Credor/Fornecedor",
+        )
+
+        # CNPJ
+        fill_field(
+            ['input[name*="cnpj"]', 'input[name*="CNPJ"]',
+             'input[placeholder*="CNPJ"]', 'input[id*="cnpj"]'],
+            note["cnpj"], "CNPJ",
+        )
+
+        # Tipo do Documento → Nota Fiscal
+        fill_field(
+            ['select[name*="tipoDocumento"]', 'select[name*="tipo_documento"]',
+             'select[id*="tipoDocumento"]', 'select:near(:text("Tipo do Documento"))'],
+            "Nota Fiscal", "Tipo do Documento",
+        )
+
+        # Nº Documento(s)
+        fill_field(
+            ['input[name*="numDocumento"]', 'input[name*="num_documento"]',
+             'input[name*="numeroDocumento"]', 'input[placeholder*="ocumento"]'],
+            note["num_nf"], "Nº Documento(s)",
+        )
+
+        # Item da Aquisição / Escopo
+        fill_field(
+            ['textarea[name*="item"]', 'textarea[name*="aquisicao"]',
+             'textarea[name*="servico"]', 'textarea[placeholder*="quisição"]',
+             'textarea[placeholder*="Serviço"]'],
+            note["escopo"], "Item da Aquisição ou Contratação do Serviço",
+        )
+
+        # Forma de pagamento
+        fill_field(
+            ['select[name*="formaPagamento"]', 'select[name*="forma_pagamento"]',
+             'select[id*="formaPagamento"]', 'select:near(:text("Forma de pagamento"))'],
+            note["forma_pagamento"], "Forma de pagamento",
+        )
+
+        # Número do documento de pagamento
+        fill_field(
+            ['input[name*="numPagamento"]', 'input[name*="num_pagamento"]',
+             'input[name*="numeroDocumentoPagamento"]',
+             'input[placeholder*="agamento"]'],
+            note["num_pagamento"], "Número do documento de pagamento",
+        )
+
+        # Valor Líquido
+        fill_field(
+            ['input[name*="valorLiquido"]', 'input[name*="valor_liquido"]',
+             'input[name*="valorLiq"]', 'input[placeholder*="alor"]'],
+            note["valor_liquido"], "Valor Líquido",
+        )
 
         step("Campos preenchidos.")
 
@@ -363,6 +482,9 @@ def run(pdf_path: Path, note_path: Path, headless: bool):
                 continue
 
         print(f"\n✅ Submissão concluída!")
+        print(f"   Fornecedor: {note['razao_social']}  |  CNPJ: {note['cnpj']}")
+        print(f"   NF nº:      {note['num_nf']}  |  Valor: {note['valor_liquido']}")
+        print(f"   Pagamento:  {note['data_pagamento']}  |  {note['forma_pagamento']}")
         browser.close()
 
 
