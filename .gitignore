@@ -22,3 +22,9 @@ ENV/
 # OS
 .DS_Store
 Thumbs.db
+
+# Credenciais (NUNCA commitar)
+.env
+
+# Arquivos gerados pela skill pdf-notes-form
+output/
